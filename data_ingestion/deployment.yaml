@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming-simulator-deployment
+  labels:
+    app: streaming-simulator
+spec:
+  replicas: 1  # <--- Number of Simulators (Can be Incremented to Scale)
+  selector:
+    matchLabels:
+      app: streaming-simulator
+  template:
+    metadata:
+      labels:
+        app: streaming-simulator
+    spec:
+      containers:
+      - name: simulator
+        # Image Route
+        image: us-central1-docker.pkg.dev/TU_PROJECT_ID/my-repo/streaming-simulator:v1
+        resources:
+          requests:
+            cpu: "500m" # Medio CPU
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        env:
+        - name: PROJECT_ID
+          value: "TU_PROJECT_ID" # <--- CAMBIA ESTO
+        - name: TOPIC_ID
+          value: "TU_TOPIC_ID" # <--- CAMBIA ESTO
+        - name: BATCH_SIZE
+          value: "10000"
