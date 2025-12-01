@@ -18,8 +18,8 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO,
 # Querying into Big Query (Ordering by date is added to more acurrately simulate real time data generation)
 QUERY = """
     SELECT 
-        stn, wban, year, mo, da, 
-        temp, dewp, slp, stp, visib, wdsp, mxpsd, gust, max, min, prcp
+        year, mo, da, 
+        temp, dewp, slp, stp, visib, wdsp, mxpsd, gust, max, min, prcp, thunder
     FROM `bigquery-public-data.noaa_gsod.gsod2023`
     ORDER BY year, mo, da
     LIMIT 35000000
