@@ -43,26 +43,31 @@ def run_simulator():
         max_messages=BATCH_SIZE, 
         max_latency=0.05,
     )
-    publisher = pubsub_v1.PublisherClient(batch_settings=batch_settings)
-
+    publisher = pubsub_v1.PublisherClient()
+    
+    # Buffer de objetos (dicts), no de bytes
+    batch_rows = [] 
+    
     for row in rows_iterator:
-        data_str = json.dumps(dict(row)).encode("utf-8")
-        batch_buffer.append(data_str)
+        # 1. Acumulamos el diccionario puro
+        batch_rows.append(dict(row))
 
-        if len(batch_buffer) >= BATCH_SIZE:
+        # 2. Cuando llegamos a 10,000
+        if len(batch_rows) >= BATCH_SIZE:
             start_time = time.time()
             
-            # Publication Loop
-            for data in batch_buffer:
-                publisher.publish(topic_path, data)
+            payload = json.dumps(batch_rows).encode("utf-8")
+            
+            # Publishing Per Batch
+            future = publisher.publish(topic_path, payload)
+            future.result() # Waiting for result
             
             process_time = time.time() - start_time
             
-            # Cleaning Buffer
-            logging.info(f"Batch de {len(batch_buffer)} enviado en {process_time:.4f}s")
-            batch_buffer = []
+            logging.info(f"{len(batch_rows)} rows sent in {process_time:.4f}s. Aprox. Size: {len(payload)/1024/1024:.2f} MB")
+            batch_rows = []
 
-            # Controrlling the publications so that they are constant 10,000/sec
+            # Time Control
             sleep_time = 1.0 - process_time
             if sleep_time > 0:
                 time.sleep(sleep_time)
