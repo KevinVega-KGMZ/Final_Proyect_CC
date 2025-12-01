@@ -19,7 +19,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO,
 QUERY = """
     SELECT 
         year, mo, da, 
-        temp, dewp, slp, stp, visib, wdsp, mxpsd, gust, max, min, prcp, thunder
+        temp, dewp, slp, stp, visib, wdsp, mxpsd, gust, max, min, prcp, sndp, thunder
     FROM `bigquery-public-data.noaa_gsod.gsod2023`
     ORDER BY year, mo, da
     LIMIT 35000000
