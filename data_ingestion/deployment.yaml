@@ -1,11 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: streaming-simulator-deployment
-  labels:
-    app: streaming-simulator
+  name: streaming-simulator
 spec:
-  replicas: 1  # <--- Number of Simulators (Can be Incremented to Scale)
+  replicas: 1
   selector:
     matchLabels:
       app: streaming-simulator
@@ -14,21 +12,18 @@ spec:
       labels:
         app: streaming-simulator
     spec:
+      serviceAccountName: default
       containers:
       - name: simulator
-        # Image Route
-        image: us-central1-docker.pkg.dev/TU_PROJECT_ID/my-repo/streaming-simulator:v1
-        resources:
-          requests:
-            cpu: "500m" # Medio CPU
-            memory: "512Mi"
-          limits:
-            cpu: "1000m"
-            memory: "1Gi"
+        image: IMAGE_PLACEHOLDER
         env:
         - name: PROJECT_ID
-          value: "TU_PROJECT_ID" # <--- CAMBIA ESTO
+          value: "PROJECT_ID_PLACEHOLDER"
         - name: TOPIC_ID
-          value: "TU_TOPIC_ID" # <--- CAMBIA ESTO
+          value: "noaa-raw"
         - name: BATCH_SIZE
-          value: "10000"
+          value: "5000"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
