@@ -35,24 +35,37 @@ Siga esta guía si prefiere ejecutar cada componente manualmente para comprender
 Defina las variables globales que se utilizarán en todo el proceso.
 
 ```bash
-# Configuración básica
+# 1. Definir variables en memoria
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION="us-central1"
 export PROJECT_NUM=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
-
-# Nombres de recursos
 export BUCKET_NAME="${PROJECT_ID}-dataflow-staging"
 export INPUT_TOPIC="noaa-raw"
 export OUTPUT_TOPIC="noaa-clean-for-ml"
 export REPO_NAME="mlops-repo"
 export APP_NAME="streaming-simulator"
 export CLUSTER_NAME="mlops-cluster"
-
-# Cuentas de servicio
 export GSA_NAME="mlops-sa"
 export GSA_EMAIL="$GSA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
 
-echo "Proyecto configurado: $PROJECT_ID"
+# 2. Generar archivo .env (CRÍTICO para el Paso 5)
+cat <<EOF > .env
+PROJECT_ID=$PROJECT_ID
+REGION=$REGION
+PROJECT_NUM=$PROJECT_NUM
+BUCKET_NAME=$BUCKET_NAME
+INPUT_TOPIC=$INPUT_TOPIC
+OUTPUT_TOPIC=$OUTPUT_TOPIC
+REPO_NAME=$REPO_NAME
+APP_NAME=$APP_NAME
+CLUSTER_NAME=$CLUSTER_NAME
+GSA_EMAIL=$GSA_EMAIL
+EOF
+
+# 3. Cargar variables (para asegurar que estén disponibles)
+source .env
+
+echo "Archivo .env generado y variables cargadas."
 ```
 
 ### 2. Infraestructura Base
@@ -161,6 +174,7 @@ kubectl annotate serviceaccount default \
 
 # 5. Inyectar variables y desplegar
 # Nota: Usamos envsubst para reemplazar las variables en el YAML dinámicamente
+source .env
 envsubst < data_ingestion/deployment.yaml | kubectl apply -f -
 ```
 
