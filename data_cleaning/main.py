@@ -21,6 +21,9 @@ class CleanBatch(beam.DoFn):
             input_batch = json.loads(element.decode('utf-8'))
             output_batch = []
             
+            # Calculamos total entrada para el log
+            total_input = len(input_batch)
+            
             # 1. Calcular media del batch para SLP
             valid_slp = []
             for row in input_batch:
@@ -73,6 +76,15 @@ class CleanBatch(beam.DoFn):
 
                 if not drop_row:
                     output_batch.append(clean_row)
+
+            # --- LOGGING (SIN EMOJIS) ---
+            total_output = len(output_batch)
+            slp_log = f"{batch_slp_mean:.2f}" if batch_slp_mean is not None else "N/A"
+            
+            if total_output > 0:
+                logging.info(f"Batch procesado. Entrada: {total_input} -> Salida: {total_output}. Media SLP: {slp_log}")
+            else:
+                logging.warning(f"ALERTA: Batch procesado. Entrada: {total_input} -> TODOS FILTRADOS (Salida 0).")
 
             if output_batch:
                 yield json.dumps(output_batch).encode('utf-8')
