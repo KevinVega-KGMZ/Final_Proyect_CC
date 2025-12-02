@@ -15,14 +15,15 @@ spec:
       serviceAccountName: default
       containers:
       - name: simulator
-        image: IMAGE_PLACEHOLDER
+        # Aqui usamos la variable combinada
+        image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${TAG}
         env:
         - name: PROJECT_ID
-          value: "PROJECT_ID_PLACEHOLDER"
+          value: "${PROJECT_ID}"
         - name: TOPIC_ID
-          value: "noaa-raw"
+          value: "${TOPIC_ID}"
         - name: BATCH_SIZE
-          value: "5000"
+          value: "${BATCH_SIZE}"
         resources:
           requests:
             memory: "512Mi"
