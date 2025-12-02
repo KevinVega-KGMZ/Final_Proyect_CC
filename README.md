@@ -1,7 +1,3 @@
-Aquí tienes el `README.md` profesional diseñado como un tutorial paso a paso. Está estructurado para que puedas copiar y pegar los comandos directamente en tu Google Cloud Shell.
-
----
-
 # Real-Time Thunder Prediction System (MLOps on GCP)
 
 Este proyecto implementa un pipeline de MLOps de extremo a extremo en Google Cloud Platform. El sistema simula un flujo de datos meteorológicos en tiempo real, los limpia, entrena un modelo incremental y visualiza las métricas de rendimiento en vivo.
