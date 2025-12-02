@@ -13,7 +13,7 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", 5000))
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - [Generator] - %(message)s')
 
-# Consulta Multianual (2015-2025)
+# Consulta Multianual (2015-2025) - SIN gust NI visib
 QUERY = """
     SELECT 
         year, mo, da, 
