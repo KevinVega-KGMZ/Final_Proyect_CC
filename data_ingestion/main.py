@@ -20,7 +20,6 @@ QUERY = """
         temp, dewp, slp, stp, wdsp, mxpsd, max, min, prcp, sndp, thunder
     FROM `bigquery-public-data.noaa_gsod.gsod*`
     WHERE _TABLE_SUFFIX BETWEEN '2015' AND '2025'
-    ORDER BY year, mo, da
     LIMIT 35000000
 """
 
