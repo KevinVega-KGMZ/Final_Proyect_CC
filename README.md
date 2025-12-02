@@ -1,109 +1,221 @@
 # Real-Time Thunder Prediction System (MLOps on GCP)
 
-Este repositorio contiene la implementación completa de un pipeline de MLOps de extremo a extremo en Google Cloud Platform. El sistema simula un flujo de datos meteorológicos en tiempo real, los procesa, limpia y entrena un modelo de Machine Learning incremental para predecir la ocurrencia de truenos.
+Este proyecto implementa un sistema completo de MLOps en Google Cloud Platform. Simula un flujo de datos meteorológicos en tiempo real, procesa la información mediante un pipeline ETL, entrena un modelo incremental y visualiza los resultados en vivo.
 
-## Descripción de la Arquitectura
+## Prerrequisitos
 
-El flujo de datos atraviesa los siguientes componentes en la nube:
+*   Proyecto en Google Cloud Platform con facturación habilitada.
+*   Google Cloud Shell (recomendado) o SDK local configurado.
+*   Permisos de Propietario (Owner) en el proyecto.
 
-1.  **Ingestión de Datos (GKE):** Un generador en Python desplegado en Google Kubernetes Engine lee datos históricos (2015-2025) de BigQuery y los publica secuencialmente en un tópico de Pub/Sub para simular un entorno de streaming.
-2.  **ETL y Limpieza (Dataflow):** Un pipeline de Apache Beam consume los datos crudos, imputa valores faltantes (medias móviles para presión, ceros para precipitación) y filtra registros corruptos.
-3.  **Entrenamiento de Modelo (Cloud Run):** Una API construida con FastAPI y River (Online Machine Learning) consume los datos limpios. Con cada nuevo evento, el modelo actualiza sus pesos (entrenamiento incremental) y guarda métricas de rendimiento en BigQuery.
-4.  **Monitoreo (Cloud Run):** Un dashboard interactivo basado en Streamlit visualiza las métricas de ROC-AUC y Accuracy en tiempo real.
+---
 
-## Estructura del Repositorio
+## Opción 1: Despliegue Automático (Recomendado)
 
-```text
-.
-├── data_ingestion/       # Código fuente del generador y manifiesto Kubernetes
-│   ├── Dockerfile
-│   ├── main.py
-│   └── deployment.yaml
-├── data_cleaning/        # Pipeline ETL de Apache Beam
-│   └── main.py
-├── model_serving/        # API de Entrenamiento y Predicción
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── main.py
-├── dashboard/            # Visualización de Métricas
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── app.py
-├── deploy.sh             # Script maestro de automatización
-└── README.md             # Documentación del proyecto
-```
+Si desea desplegar toda la infraestructura y servicios en un solo paso, utilice el script de automatización incluido.
 
-## Requisitos Previos
-
-*   Cuenta de Google Cloud Platform activa.
-*   Google Cloud Shell (recomendado) o Google Cloud SDK instalado localmente.
-*   Permisos de Propietario o Editor en el proyecto de GCP seleccionado.
-
-## Guía de Despliegue Automatizado
-
-El despliegue se gestiona mediante el script `deploy.sh`, que automatiza la creación de infraestructura, construcción de imágenes Docker y configuración de servicios.
-
-### Pasos para el Despliegue
-
-1.  **Clonar el repositorio:**
-    Asegúrese de tener todos los archivos en su entorno de trabajo (Cloud Shell).
-
-2.  **Otorgar permisos de ejecución al script:**
-    Ejecute el siguiente comando en la terminal para hacer ejecutable el script de despliegue.
-
+1.  **Prepare el script:**
     ```bash
     chmod +x deploy.sh
     ```
 
-3.  **Ejecutar el despliegue:**
-    Inicie el proceso. El script detectará automáticamente su Project ID y región.
-
+2.  **Ejecute el despliegue:**
     ```bash
     ./deploy.sh
     ```
+    *Este proceso tomará aproximadamente 15 minutos.*
 
-    *Nota: El proceso completo puede tardar entre 10 y 15 minutos, ya que incluye la creación de un clúster de Kubernetes y la compilación de contenedores.*
+---
 
-### ¿Qué hace el script deploy.sh?
+## Opción 2: Despliegue Manual Paso a Paso
 
-*   Habilita las APIs necesarias (Dataflow, GKE, Cloud Run, Artifact Registry, etc.).
-*   Crea los tópicos de Pub/Sub y los Datasets de BigQuery.
-*   Configura las cuentas de servicio (IAM) y los permisos necesarios.
-*   Genera un archivo `.env` dinámico con las variables del proyecto.
-*   Compila las imágenes Docker y las sube a Artifact Registry.
-*   Despliega el pipeline de Dataflow.
-*   Despliega el generador en GKE inyectando las variables de entorno mediante `envsubst`.
-*   Despliega los servicios de Cloud Run y configura las suscripciones Push.
+Siga esta guía si prefiere ejecutar cada componente manualmente para comprender la arquitectura o depurar el proceso. Copie y pegue los siguientes bloques de código en su terminal.
 
-## Configuración Técnica y Variables
-
-El sistema utiliza inyección de variables de entorno para mantener la portabilidad del código. El archivo `data_ingestion/deployment.yaml` utiliza placeholders con el formato `${VARIABLE}`.
-
-Durante el despliegue, el script genera un archivo `.env` y utiliza la herramienta `envsubst` para reemplazar estos valores dinámicamente antes de aplicar el manifiesto en Kubernetes:
+### 1. Configuración del Entorno
+Defina las variables globales que se utilizarán en todo el proceso.
 
 ```bash
-# Ejemplo del comando interno ejecutado por el script
+# Configuración básica
+export PROJECT_ID=$(gcloud config get-value project)
+export REGION="us-central1"
+export PROJECT_NUM=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+
+# Nombres de recursos
+export BUCKET_NAME="${PROJECT_ID}-dataflow-staging"
+export INPUT_TOPIC="noaa-raw"
+export OUTPUT_TOPIC="noaa-clean-for-ml"
+export REPO_NAME="mlops-repo"
+export APP_NAME="streaming-simulator"
+export CLUSTER_NAME="mlops-cluster"
+
+# Cuentas de servicio
+export GSA_NAME="mlops-sa"
+export GSA_EMAIL="$GSA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
+
+echo "Proyecto configurado: $PROJECT_ID"
+```
+
+### 2. Infraestructura Base
+Habilite las APIs necesarias y cree los recursos de almacenamiento y mensajería.
+
+```bash
+# Habilitar APIs
+gcloud services enable \
+    dataflow.googleapis.com \
+    artifactregistry.googleapis.com \
+    container.googleapis.com \
+    pubsub.googleapis.com \
+    bigquery.googleapis.com \
+    storage.googleapis.com \
+    run.googleapis.com \
+    cloudbuild.googleapis.com
+
+# Crear Tópicos Pub/Sub
+gcloud pubsub topics create $INPUT_TOPIC || true
+gcloud pubsub topics create $OUTPUT_TOPIC || true
+
+# Crear Bucket de Almacenamiento
+gsutil mb -l $REGION gs://$BUCKET_NAME || true
+
+# Crear Dataset y Tabla en BigQuery
+bq mk --dataset weather_data || true
+bq mk --table weather_data.model_metrics \
+    timestamp:TIMESTAMP,batch_id:INTEGER,roc_auc:FLOAT,accuracy:FLOAT,model_name:STRING || true
+
+# Crear Repositorio de Artefactos Docker
+gcloud artifacts repositories create $REPO_NAME \
+    --repository-format=docker \
+    --location=$REGION \
+    --description="Repositorio MLOps" || true
+```
+
+### 3. Configuración de IAM (Gestión de Identidad)
+Asigne los permisos necesarios para que los servicios interactúen entre sí de forma segura.
+
+```bash
+# 1. Permisos para el Agente de Dataflow
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:service-${PROJECT_NUM}@dataflow-service-producer-prod.iam.gserviceaccount.com" \
+    --role="roles/dataflow.serviceAgent"
+
+# 2. Permisos para los Workers de Compute Engine
+COMPUTE_SA="${PROJECT_NUM}-compute@developer.gserviceaccount.com"
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$COMPUTE_SA --role=roles/dataflow.worker
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$COMPUTE_SA --role=roles/storage.objectAdmin
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$COMPUTE_SA --role=roles/dataflow.admin
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$COMPUTE_SA --role=roles/pubsub.editor
+
+# 3. Crear Cuenta de Servicio para GKE y asignar permisos
+gcloud iam service-accounts create $GSA_NAME --display-name="MLOps SA" || true
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:$GSA_EMAIL" --role="roles/bigquery.jobUser"
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:$GSA_EMAIL" --role="roles/bigquery.dataViewer"
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:$GSA_EMAIL" --role="roles/pubsub.publisher"
+```
+
+### 4. Despliegue del Pipeline ETL (Dataflow)
+Inicie el trabajo de limpieza de datos. Este proceso se ejecutará en segundo plano.
+
+```bash
+# Instalar dependencias
+pip install apache-beam[gcp]
+
+# Lanzar el Job
+export JOB_NAME="cleaner-listener-$(date +%Y%m%d-%H%M%S)"
+
+python3 data_cleaning/main.py \
+  --project_id $PROJECT_ID \
+  --job_name $JOB_NAME \
+  --input_topic "projects/$PROJECT_ID/topics/$INPUT_TOPIC" \
+  --output_topic "projects/$PROJECT_ID/topics/$OUTPUT_TOPIC" \
+  --staging_bucket "gs://$BUCKET_NAME" \
+  --region $REGION \
+  --disk_size_gb 30 \
+  --max_num_workers 4 \
+  --worker_machine_type n1-standard-2
+```
+
+### 5. Despliegue del Generador (GKE)
+Despliegue el simulador de datos en Kubernetes Engine utilizando Workload Identity.
+
+```bash
+# 1. Construir la imagen Docker
+gcloud builds submit ./data_ingestion \
+    --tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$APP_NAME:v1
+
+# 2. Crear Cluster Autopilot
+gcloud container clusters create-auto $CLUSTER_NAME \
+    --region $REGION \
+    --project $PROJECT_ID
+
+# 3. Obtener credenciales
+gcloud container clusters get-credentials $CLUSTER_NAME --region $REGION
+
+# 4. Configurar Workload Identity (Vincular K8s SA con Google SA)
+gcloud iam service-accounts add-iam-policy-binding $GSA_EMAIL \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:$PROJECT_ID.svc.id.goog[default/default]"
+
+kubectl annotate serviceaccount default \
+    iam.gke.io/gcp-service-account=$GSA_EMAIL \
+    --overwrite
+
+# 5. Inyectar variables y desplegar
+# Nota: Usamos envsubst para reemplazar las variables en el YAML dinámicamente
 envsubst < data_ingestion/deployment.yaml | kubectl apply -f -
 ```
 
-Esto asegura que el despliegue funcione correctamente en cualquier Proyecto de Google Cloud sin necesidad de editar manualmente los archivos YAML.
+### 6. Despliegue del Modelo y Dashboard (Cloud Run)
+Despliegue la API de entrenamiento y la interfaz de usuario.
 
-## Verificación y Monitoreo
+```bash
+# --- Despliegue del Modelo ---
+# 1. Construir
+gcloud builds submit ./model_serving --tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/model-serving:v1
 
-Una vez finalizado el script `deploy.sh`, la consola mostrará las URLs de los servicios.
+# 2. Desplegar
+gcloud run deploy model-serving \
+    --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/model-serving:v1 \
+    --region $REGION \
+    --platform managed \
+    --allow-unauthenticated \
+    --set-env-vars PROJECT_ID=$PROJECT_ID
 
-1.  **Dashboard de Métricas:** Acceda a la URL del servicio `dashboard` proporcionada al final de la ejecución para ver el rendimiento del modelo.
-2.  **Estado del Pipeline:** Visite la consola de Google Cloud -> Dataflow para verificar que el trabajo `cleaner-listener` esté en estado "Running".
-3.  **Logs del Generador:** Puede verificar que los datos se están enviando correctamente revisando los logs del clúster GKE:
-    ```bash
-    kubectl logs -l app=streaming-simulator
-    ```
+# 3. Crear suscripción Push (Pub/Sub -> Cloud Run)
+SERVICE_URL=$(gcloud run services describe model-serving --region $REGION --format 'value(status.url)')
+gcloud pubsub subscriptions create sub-model-training \
+    --topic $OUTPUT_TOPIC \
+    --push-endpoint "$SERVICE_URL/predict-and-train" \
+    --ack-deadline 600 || true
+
+
+# --- Despliegue del Dashboard ---
+# 1. Construir
+gcloud builds submit ./dashboard --tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/dashboard:v1
+
+# 2. Desplegar
+gcloud run deploy dashboard \
+    --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/dashboard:v1 \
+    --region $REGION \
+    --platform managed \
+    --allow-unauthenticated \
+    --set-env-vars PROJECT_ID=$PROJECT_ID
+
+echo "URL del Dashboard:"
+gcloud run services describe dashboard --region $REGION --format 'value(status.url)'
+```
+
+---
+
+## Verificación
+
+1.  Acceda a la URL del Dashboard generada en el paso anterior.
+2.  Verifique en la consola de Dataflow que el trabajo `cleaner-listener` esté en estado "Running".
+3.  Verifique los logs del generador: `kubectl logs -l app=streaming-simulator`.
 
 ## Limpieza de Recursos
 
-Para evitar cargos innecesarios en su facturación de Google Cloud, elimine los recursos una vez finalizada la prueba.
+Para eliminar todos los recursos y detener la facturación:
 
-Opción recomendada (eliminar proyecto completo):
 ```bash
 gcloud projects delete $PROJECT_ID
 ```
