@@ -1,4 +1,3 @@
-```markdown
 # Real-Time Thunder Prediction System (MLOps on GCP)
 
 Este repositorio contiene la implementación completa de un pipeline de MLOps de extremo a extremo en Google Cloud Platform. El sistema simula un flujo de datos meteorológicos en tiempo real, los procesa, limpia y entrena un modelo de Machine Learning incremental para predecir la ocurrencia de truenos.
