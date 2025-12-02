@@ -18,6 +18,10 @@ class CleanBatch(beam.DoFn):
             # List Decoding
             input_batch = json.loads(element.decode('utf-8'))
             output_batch = []
+            
+            # --- LOG DE ENTRADA (Opcional, para debug) ---
+            # Calcula cuantas filas vienen en este mensaje
+            total_input = len(input_batch)
 
             for row in input_batch:
                 clean_row = {}
@@ -46,12 +50,20 @@ class CleanBatch(beam.DoFn):
                 if is_valid_row:
                     output_batch.append(clean_row)
 
+            # --- LOG DE SALIDA ---
+            # Muestra cuantas entraron vs cuantas quedaron
+            total_output = len(output_batch)
+            if total_output > 0:
+                logging.info(f"OK: Batch Processed: Input {total_input} rows -> Output {total_output} clean rows.")
+            else:
+                logging.warning(f"WARNING: Batch Processed: Input {total_input} rows -> ALL FILTERED OUT (0 output).")
+
             # Sending the Batch
             if output_batch:
                 yield json.dumps(output_batch).encode('utf-8')
 
         except Exception as e:
-            logging.error(f"Error Processing the Batch: {e}")
+            logging.error(f"ERROR: Error Processing the Batch: {e}")
 
 # --- PIPELINE ---
 def run():
@@ -60,6 +72,9 @@ def run():
     parser.add_argument('--input_topic', required=True)
     parser.add_argument('--output_topic', required=True)
     parser.add_argument('--staging_bucket', required=True)
+    
+    # Argumentos opcionales para controlar workers desde consola si se desea
+    parser.add_argument('--disk_size_gb', type=int, default=30)
     
     known_args, pipeline_args = parser.parse_known_args()
 
@@ -83,5 +98,13 @@ def run():
         )
 
 if __name__ == '__main__':
+    # Configurar nivel de log general
     logging.getLogger().setLevel(logging.INFO)
+
+    # --- SILENCIAR WARNINGS DE GOOGLE ---
+    # Esto elimina el ruido de "httplib2 transport does not support per-request timeout"
+    logging.getLogger("google_auth_httplib2").setLevel(logging.ERROR)
+    logging.getLogger("google.auth.transport.requests").setLevel(logging.ERROR)
+    logging.getLogger("urllib3").setLevel(logging.ERROR)
+    
     run()
