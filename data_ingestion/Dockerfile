@@ -1,17 +1,5 @@
-# Light Python Image
 FROM python:3.9-slim
-
-# To Avoid Python Sending the Log to Console
-ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-
-WORKDIR /app
-
-# Installing the Necessary GCP Libraries
-RUN pip install --no-cache-dir google-cloud-bigquery google-cloud-pubsub
-
-# Copying the Code
+RUN pip install google-cloud-bigquery google-cloud-pubsub
 COPY main.py .
-
-# Code Execution
 CMD ["python", "main.py"]
