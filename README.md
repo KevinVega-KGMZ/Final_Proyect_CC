@@ -296,4 +296,3 @@ gcloud run services delete model-serving --region us-central1 --quiet
 gcloud run services delete dashboard --region us-central1 --quiet
 gcloud dataflow jobs cancel $(gcloud dataflow jobs list --status=active --format="value(JOB_ID)") --region us-central1
 ```
-```
