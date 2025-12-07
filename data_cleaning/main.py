@@ -111,13 +111,16 @@ def run():
     google_cloud_options.staging_location = f"{known_args.staging_bucket}/staging"
     google_cloud_options.temp_location = f"{known_args.staging_bucket}/temp"
 
-    with beam.Pipeline(options=options) as p:
-        (
-            p
-            | 'Read PubSub' >> beam.io.ReadFromPubSub(topic=known_args.input_topic)
-            | 'Clean Logic' >> beam.ParDo(CleanBatch())
-            | 'Write PubSub' >> beam.io.WriteToPubSub(topic=known_args.output_topic)
-        )
+    p = beam.Pipeline(options=options)
+    
+    (
+        p
+        | 'Read PubSub' >> beam.io.ReadFromPubSub(topic=known_args.input_topic)
+        | 'Clean Logic' >> beam.ParDo(CleanBatch())
+        | 'Write PubSub' >> beam.io.WriteToPubSub(topic=known_args.output_topic)
+    )
+
+    result = p.run()
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
